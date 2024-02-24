@@ -1,0 +1,159 @@
+//BaseTest.java
+
+package com.capstone.base;
+
+import io.github.bonigarcia.wdm.WebDriverManager;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+
+import java.util.concurrent.TimeUnit;
+
+public class BaseTest {
+    protected WebDriver driver;
+
+    @BeforeMethod
+    public void setUp() {
+        System.setProperty("webdriver.chrome.driver", "src/test/java/com/capstone/resources/chromedriver.exe");
+        driver = new ChromeDriver();
+        driver.get("http://www.saucedemo.com");
+        driver.manage().window().maximize();
+        driver.manage().timeouts().implicitlyWait(10, TimeUnit.SECONDS);
+    }
+
+    @AfterMethod
+    public void tearDown() {
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+}
+
+
+
+
+//LoginPage.java
+
+package com.capstone.pages;
+
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
+
+public class LoginPage {
+    private WebDriver driver;
+
+    public LoginPage(WebDriver driver) {
+        this.driver = driver;
+    }
+
+    public void login(String username, String password) {
+        driver.findElement(By.id("user-name")).sendKeys(username);
+        driver.findElement(By.id("password")).sendKeys(password);
+        driver.findElement(By.id("login-button")).click();
+    }
+
+    public String getErrorMessage() {
+        return driver.findElement(By.cssSelector(".error-message")).getText();
+    }
+
+    public String getPageTitle() {
+        return driver.getTitle();
+    }
+}
+
+
+
+
+//ExcelUtils.java
+
+package com.capstone.utils;
+
+import org.apache.poi.ss.usermodel.*;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Objects;
+
+public class ExcelUtils {
+
+    public static Object[][] readExcel(String filePath, String sheetName) throws IOException {
+        FileInputStream file = new FileInputStream(filePath);
+
+        Workbook workbook = WorkbookFactory.create(file);
+
+        Sheet sheet = workbook.getSheet(sheetName);
+
+        int rowCount = sheet.getLastRowNum();
+        int colCount = sheet.getRow(0).getLastCellNum();
+
+        Object[][] data = new Object[rowCount][colCount];
+
+        for (int i = 0; i < rowCount; i++) {
+            Row row = sheet.getRow(i + 1); // Skip the header row
+            for (int j = 0; j < colCount; j++) {
+                Cell cell = row.getCell(j);
+                if(cell != null){
+                    data[i][j] = cell.toString();
+                }
+
+            }
+        }
+
+        workbook.close();
+        file.close();
+        return data;
+    }
+}
+
+
+
+
+//LoginTest.java
+
+package com.capstone.tests;
+
+import com.capstone.base.BaseTest;
+import com.capstone.pages.LoginPage;
+import com.capstone.utils.ExcelUtils;
+import org.testng.Assert;
+import org.testng.annotations.DataProvider;
+import org.testng.annotations.Test;
+
+import java.io.IOException;
+
+public class LoginTest extends BaseTest {
+
+    @DataProvider(name = "loginData")
+    public Object[][] getLoginData() throws IOException {
+        String filePath = "src/test/java/com/capstone/data/TestData.xlsx";
+        String sheetName = "LoginData";
+        return ExcelUtils.readExcel(filePath, sheetName);
+    }
+
+    @Test(dataProvider = "loginData")
+    public void loginTest(String username, String password, String expectedTitle, String expectedErrorMessage) {
+        LoginPage loginPage = new LoginPage(driver);
+        loginPage.login(username, password);
+
+        if (expectedTitle.equals("Swag Labs")) {
+            Assert.assertEquals(loginPage.getPageTitle(), expectedTitle);
+        } else {
+            Assert.assertEquals(loginPage.getErrorMessage(), expectedErrorMessage);
+        }
+    }
+}
+
+
+
+
+//TestNG.XML
+
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="TestSuite">
+    <test name="LoginTest">
+        <classes>
+            <class name="com.capstone.tests.LoginTest"/>
+        </classes>
+    </test>
+</suite>
